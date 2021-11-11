@@ -1,0 +1,5 @@
+/data/*
+!/data/*.py
+!*.gitkeep
+/lightning_logs/
+/weights/
