@@ -24,7 +24,7 @@ def parse_train_args():
                         help="number of workers for the dataloader")
     parser.add_argument("--batch_size", type=int, default=1,
                         help="number of couple of frames in each batch")
-    parser.add_argument("--learning_rate", type=int, default=1e-5,
+    parser.add_argument("--learning_rate", type=float, default=1e-5,
                         help="learning rate")
     parser.add_argument("--log_level", type=str, default="info",
                         help="logging level")
@@ -73,8 +73,6 @@ def parse_test_args():
                         help="number of workers for the dataloader")
     parser.add_argument("--batch_size", type=int, default=1,
                         help="number of couple of frames in each batch")
-    parser.add_argument("--learning_rate", type=int, default=1e-5,
-                        help="learning rate")
     parser.add_argument("--log_level", type=str, default="info",
                         help="logging level")
     args = parser.parse_args()
@@ -96,7 +94,6 @@ def parse_test_args():
     else:
         assert args.num_workers >= 1
     assert args.batch_size >= 1
-    assert args.learning_rate >= 0
     assert args.log_level in {"debug", "info", "warning"}
     if args.log_level == "debug":
         logging.basicConfig(level=logging.DEBUG)
