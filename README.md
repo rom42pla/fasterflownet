@@ -5,7 +5,18 @@
 - create a new `conda` environment with `conda create`
 - log into your `conda` environment using `conda activate <new_environment>`
 - install Python packages using `pip install -r requirements.txt`
-
+- download the datasets into `data` to have a directory tree like the following:
+``` 
+data
+    sintel
+        bundler
+        flow_code
+        test
+        training
+        README.txt
+    .gitkeep
+    sintel.py
+``` 
 ## Train
 
 ```bash
