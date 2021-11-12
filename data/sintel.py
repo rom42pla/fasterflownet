@@ -7,14 +7,36 @@ import einops
 import imageio
 import numpy as np
 import torch
+import torchvision
 from torch.utils.data import Dataset
 import torchvision.transforms as transforms
 import torchvision.transforms.functional as TF
 
 
+def image_random_gamma(image, min_gamma=0.7, max_gamma=1.5, clip_image=False):
+    gamma = np.random.uniform(min_gamma, max_gamma)
+    adjusted = torch.pow(image, gamma)
+    if clip_image:
+        adjusted.clamp_(0.0, 1.0)
+    return adjusted
+
+
+class RandomGamma:
+    def __init__(self, min_gamma=0.7, max_gamma=1.5, clip_image=False):
+        self._min_gamma = min_gamma
+        self._max_gamma = max_gamma
+        self._clip_image = clip_image
+
+    def __call__(self, image):
+        return image_random_gamma(
+            image,
+            min_gamma=self._min_gamma,
+            max_gamma=self._max_gamma,
+            clip_image=self._clip_image)
+
 class SINTELDataset(Dataset):
     def __init__(self, path, split, db_type="final", random_crop=False, center_crop=False, zoom=False, rotation=False,
-                 horizontal_flip=False):
+                 horizontal_flip=False,photometric_augmentations=True):
         assert exists(path)
         self.path = path
 
@@ -35,7 +57,7 @@ class SINTELDataset(Dataset):
         self.rotation = rotation
         assert isinstance(horizontal_flip, bool)
         self.horizontal_flip = horizontal_flip
-
+        self.photometric_augmentation = photometric_augmentations
         self.samples = []
         for scene in os.listdir(join(self.split_path, db_type)):
             for frame1_filename in os.listdir(join(self.split_path, db_type, scene)):
@@ -103,6 +125,13 @@ class SINTELDataset(Dataset):
                 if not isinstance(sample[k], torch.Tensor):
                     continue
                 sample[k] = TF.rotate(sample[k], angle=angle, interpolation=TF.InterpolationMode.BILINEAR)
+        if self.photometric_augmentation:
+            for k, v in sample.items():
+                if not isinstance(sample[k], torch.Tensor):
+                    continue
+
+                sample[k] = torchvision.transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.5)(sample[k])
+                sample[k] = transforms.RandomGamma(min_gamma=0.7, max_gamma=1.5, clip_image=True)(sample[k])
 
         if "flow" in sample.keys():
             return sample["frame1"], sample["frame2"], sample["flow"]
