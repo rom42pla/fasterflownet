@@ -14,7 +14,7 @@ class Correlation(nn.Module):
         self.padlayer = nn.ConstantPad2d(pad_size, 0)
         #todo check indexing
         self.offsety, self.offsetx = torch.meshgrid([torch.arange(0, 2 * self.max_hdisp + 1),
-                                                     torch.arange(0, 2 * self.max_hdisp + 1)], indexing="ij")
+                                                     torch.arange(0, 2 * self.max_hdisp + 1)])
 
     def forward(self, in1, in2):
         in2_pad = self.padlayer(in2)

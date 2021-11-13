@@ -36,7 +36,7 @@ class RandomGamma:
 
 class SINTELDataset(Dataset):
     def __init__(self, path, split, db_type="final", random_crop=False, center_crop=False, zoom=False, rotation=False,
-                 horizontal_flip=False,photometric_augmentations=True):
+                 horizontal_flip=False,photometric_augmentations=False):
         assert exists(path)
         self.path = path
 
@@ -45,7 +45,7 @@ class SINTELDataset(Dataset):
         self.split_path = join(self.path, "training" if self.split == "train" else "test")
 
         # data augmentations
-        self.patch_size = (384, 768)
+        self.patch_size = (320, 896)
         assert not (random_crop and center_crop)
         assert isinstance(random_crop, bool)
         self.random_crop = random_crop
@@ -59,21 +59,59 @@ class SINTELDataset(Dataset):
         self.horizontal_flip = horizontal_flip
         self.photometric_augmentation = photometric_augmentations
         self.samples = []
-        for scene in os.listdir(join(self.split_path, db_type)):
-            for frame1_filename in os.listdir(join(self.split_path, db_type, scene)):
-                frame1_number = re.search("[0-9]+", frame1_filename)[0]
-                frame2_filename = frame1_filename.replace(frame1_number, str(int(frame1_number) + 1).rjust(4, "0"))
-                if not exists(join(self.split_path, db_type, scene, frame2_filename)):
-                    continue
-                sample = {
-                    "name": join(scene, frame1_filename),
-                    "frame1": join(self.split_path, db_type, scene, frame1_filename),
-                    "frame2": join(self.split_path, db_type, scene, frame2_filename)
-                    # "flow": join(self.path, "FlyingChairs_release", "data", f"{sample_name}_flow.flo"),
-                }
-                if exists(join(self.split_path, "flow", scene, frame1_filename.replace(".png", ".flo"))):
-                    sample["flow"] = join(self.split_path, "flow", scene, frame1_filename.replace(".png", ".flo"))
-                self.samples += [sample]
+        if db_type == "both":
+            db_type="clean"
+            for scene in os.listdir(join(self.split_path, db_type)):
+                for frame1_filename in os.listdir(join(self.split_path, db_type, scene)):
+                    frame1_number = re.search("[0-9]+", frame1_filename)[0]
+                    frame2_filename = frame1_filename.replace(frame1_number, str(int(frame1_number) + 1).rjust(4, "0"))
+                    if not exists(join(self.split_path, db_type, scene, frame2_filename)):
+                        continue
+                    sample = {
+                        "name": join(scene, frame1_filename),
+                        "frame1": join(self.split_path, db_type, scene, frame1_filename),
+                        "frame2": join(self.split_path, db_type, scene, frame2_filename)
+                        # "flow": join(self.path, "FlyingChairs_release", "data", f"{sample_name}_flow.flo"),
+                    }
+                    if exists(join(self.split_path, "flow", scene, frame1_filename.replace(".png", ".flo"))):
+                        sample["flow"] = join(self.split_path, "flow", scene, frame1_filename.replace(".png", ".flo"))
+                    self.samples += [sample]
+            db_type = "final"
+            for scene in os.listdir(join(self.split_path, db_type)):
+                for frame1_filename in os.listdir(join(self.split_path, db_type, scene)):
+                    frame1_number = re.search("[0-9]+", frame1_filename)[0]
+                    frame2_filename = frame1_filename.replace(frame1_number, str(int(frame1_number) + 1).rjust(4, "0"))
+                    if not exists(join(self.split_path, db_type, scene, frame2_filename)):
+                        continue
+                    sample = {
+                        "name": join(scene, frame1_filename),
+                        "frame1": join(self.split_path, db_type, scene, frame1_filename),
+                        "frame2": join(self.split_path, db_type, scene, frame2_filename)
+                        # "flow": join(self.path, "FlyingChairs_release", "data", f"{sample_name}_flow.flo"),
+                    }
+                    if exists(join(self.split_path, "flow", scene, frame1_filename.replace(".png", ".flo"))):
+                        sample["flow"] = join(self.split_path, "flow", scene, frame1_filename.replace(".png", ".flo"))
+                    self.samples += [sample]
+        else:
+            for scene in os.listdir(join(self.split_path, db_type)):
+                for frame1_filename in os.listdir(join(self.split_path, db_type, scene)):
+                    frame1_number = re.search("[0-9]+", frame1_filename)[0]
+                    frame2_filename = frame1_filename.replace(frame1_number, str(int(frame1_number) + 1).rjust(4, "0"))
+                    if not exists(join(self.split_path, db_type, scene, frame2_filename)):
+                        continue
+                    sample = {
+                        "name": join(scene, frame1_filename),
+                        "frame1": join(self.split_path, db_type, scene, frame1_filename),
+                        "frame2": join(self.split_path, db_type, scene, frame2_filename)
+                        # "flow": join(self.path, "FlyingChairs_release", "data", f"{sample_name}_flow.flo"),
+                    }
+                    if exists(join(self.split_path, "flow", scene, frame1_filename.replace(".png", ".flo"))):
+                        sample["flow"] = join(self.split_path, "flow", scene, frame1_filename.replace(".png", ".flo"))
+                    self.samples += [sample]
+        self.center_crop=transforms.CenterCrop(self.patch_size)
+        self.random_gamma = RandomGamma(min_gamma=0.7, max_gamma=1.5, clip_image=True)
+        self.color_jitter = torchvision.transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.5)
+
 
     def __len__(self):
         return len(self.samples)
@@ -97,7 +135,7 @@ class SINTELDataset(Dataset):
             for k, v in sample.items():
                 if not isinstance(sample[k], torch.Tensor):
                     continue
-                sample[k] = transforms.CenterCrop(self.patch_size)(sample[k])
+                sample[k] = self.center_crop(sample[k])
 
         if self.zoom:
             scale = 1 + (np.random.rand() * 2)
@@ -129,9 +167,11 @@ class SINTELDataset(Dataset):
             for k, v in sample.items():
                 if not isinstance(sample[k], torch.Tensor):
                     continue
+                sample[k]=transforms.ToPILImage()(sample[k])
+                sample[k] = self.color_jitter(sample[k])
+                sample[k] = transforms.PILToTensor()(sample[k])
+                sample[k] = self.random_gamma(sample[k])
 
-                sample[k] = torchvision.transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.5)(sample[k])
-                sample[k] = transforms.RandomGamma(min_gamma=0.7, max_gamma=1.5, clip_image=True)(sample[k])
 
         if "flow" in sample.keys():
             return sample["frame1"], sample["frame2"], sample["flow"]
