@@ -1,12 +1,12 @@
 import os
 from os.path import exists, join, isfile
 from copy import deepcopy
-import re
+
 
 import cv2
 
 import einops
-import imageio
+
 import numpy as np
 import torch
 import torchvision
@@ -14,27 +14,7 @@ from torch.utils.data import Dataset
 import torchvision.transforms as transforms
 import torchvision.transforms.functional as TF
 
-
-def image_random_gamma(image, min_gamma=0.7, max_gamma=1.5, clip_image=False):
-    gamma = np.random.uniform(min_gamma, max_gamma)
-    adjusted = torch.pow(image, gamma)
-    if clip_image:
-        adjusted.clamp_(0.0, 1.0)
-    return adjusted
-
-
-class RandomGamma:
-    def __init__(self, min_gamma=0.7, max_gamma=1.5, clip_image=False):
-        self._min_gamma = min_gamma
-        self._max_gamma = max_gamma
-        self._clip_image = clip_image
-
-    def __call__(self, image):
-        return image_random_gamma(
-            image,
-            min_gamma=self._min_gamma,
-            max_gamma=self._max_gamma,
-            clip_image=self._clip_image)
+from data.transform_utils import ConcatTransformSplitChainer, RandomGamma
 
 
 def read_kitti_flow(flow_file):
@@ -66,7 +46,16 @@ class KITTI2012FlowDataset(Dataset):
 
         # assert isinstance(divide_optical_flow, bool)
         # self.divide_optical_flow = divide_optical_flow
-
+        from data import transform_utils
+        self.color_jitter = transform_utils.ConcatTransformSplitChainer([
+            # uint8 -> PIL
+            transforms.ToPILImage(),
+            # PIL -> PIL : random hsv and contrast
+            transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.5),
+            # PIL -> FloatTensor
+            transforms.transforms.ToTensor(),
+            transform_utils.RandomGamma(min_gamma=0.7, max_gamma=1.5, clip_image=True),
+        ], from_numpy=False, to_numpy=False)
         self.samples_names = sorted(
             list({filename.split("_")[0] for filename in os.listdir(join(self.path, "image_0"))}))
         self.samples = []
@@ -143,14 +132,8 @@ class KITTI2012FlowDataset(Dataset):
                 if not isinstance(sample[k], torch.Tensor):
                     continue
                 sample[k] = TF.rotate(sample[k], angle=angle, interpolation=TF.InterpolationMode.BILINEAR)
-        if  self.photometric_augmentation:
-            for k, v in sample.items():
-                if not isinstance(sample[k], torch.Tensor):
-                    continue
-                sample[k] = transforms.ToPILImage()(sample[k])
-                sample[k] = self.color_jitter(sample[k])
-                sample[k] = transforms.PILToTensor()(sample[k])
-                sample[k] = self.random_gamma(sample[k])
+        if self.photometric_augmentation:
+            sample["frame1"], sample["frame2"] = self.color_jitter(sample["frame1"], sample["frame2"])
 
         if "flow_noc" in sample.keys():
             # if self.divide_optical_flow:

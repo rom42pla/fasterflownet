@@ -12,27 +12,8 @@ from torch.utils.data import Dataset
 import torchvision.transforms as transforms
 import torchvision.transforms.functional as TF
 
+from data.transform_utils import RandomGamma, ConcatTransformSplitChainer
 
-def image_random_gamma(image, min_gamma=0.7, max_gamma=1.5, clip_image=False):
-    gamma = np.random.uniform(min_gamma, max_gamma)
-    adjusted = torch.pow(image, gamma)
-    if clip_image:
-        adjusted.clamp_(0.0, 1.0)
-    return adjusted
-
-
-class RandomGamma:
-    def __init__(self, min_gamma=0.7, max_gamma=1.5, clip_image=False):
-        self._min_gamma = min_gamma
-        self._max_gamma = max_gamma
-        self._clip_image = clip_image
-
-    def __call__(self, image):
-        return image_random_gamma(
-            image,
-            min_gamma=self._min_gamma,
-            max_gamma=self._max_gamma,
-            clip_image=self._clip_image)
 
 class SINTELDataset(Dataset):
     def __init__(self, path, split, db_type="final", random_crop=False, center_crop=False, zoom=False, rotation=False,
@@ -110,7 +91,16 @@ class SINTELDataset(Dataset):
                     self.samples += [sample]
         self.center_crop=transforms.CenterCrop(self.patch_size)
         self.random_gamma = RandomGamma(min_gamma=0.7, max_gamma=1.5, clip_image=True)
-        self.color_jitter = torchvision.transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.5)
+        self.color_jitter = ConcatTransformSplitChainer([
+                # uint8 -> PIL
+                transforms.ToPILImage(),
+                # PIL -> PIL : random hsv and contrast
+                transforms.ColorJitter(brightness=0.5, contrast=0.5, saturation=0.5, hue=0.5),
+                # PIL -> FloatTensor
+                transforms.transforms.ToTensor(),
+                RandomGamma(min_gamma=0.7, max_gamma=1.5, clip_image=True),
+            ], from_numpy=False, to_numpy=False)
+
 
 
     def __len__(self):
@@ -118,6 +108,7 @@ class SINTELDataset(Dataset):
 
     def __getitem__(self, i):
         sample = deepcopy(self.samples[i])
+
         for k, v in sample.items():
             if isfile(v) and v.endswith(".png") or v.endswith(".flo"):
                 sample[k] = self.read_file(v)
@@ -164,13 +155,7 @@ class SINTELDataset(Dataset):
                     continue
                 sample[k] = TF.rotate(sample[k], angle=angle, interpolation=TF.InterpolationMode.BILINEAR)
         if self.photometric_augmentation:
-            for k, v in sample.items():
-                if not isinstance(sample[k], torch.Tensor):
-                    continue
-                sample[k]=transforms.ToPILImage()(sample[k])
-                sample[k] = self.color_jitter(sample[k])
-                sample[k] = transforms.PILToTensor()(sample[k])
-                sample[k] = self.random_gamma(sample[k])
+           sample["frame1"],sample["frame2"]=self.color_jitter(sample["frame1"],sample["frame2"])
 
 
         if "flow" in sample.keys():

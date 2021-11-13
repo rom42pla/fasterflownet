@@ -20,14 +20,14 @@ if args.dataset in {"sintel_final", "sintel_clean"}:
     train_dataset_sintel = SINTELDataset(path=join(args.data_path, "sintel"),
                                   db_type="both", #if args.dataset == "sintel_clean" else "final",
                                   split="train", random_crop=False, zoom=False,
-                                  horizontal_flip=False, rotation=False,photometric_augmentations=False)
+                                  horizontal_flip=False, rotation=False,photometric_augmentations=True)
     train_dataset_kitti2012 = KITTI2012FlowDataset(path=join(args.data_path, "kitty_2012/training"),
                                    random_crop=True, zoom=False,
-                                  horizontal_flip=False, rotation=False, photometric_augmentations=False)
+                                  horizontal_flip=False, rotation=False, photometric_augmentations=True)
     train_dataset_kitti2015 = KITTI2015FlowDataset(path=join(args.data_path, "kitty_2015/training"),
                                                    random_crop=True, zoom=False,
-                                                   horizontal_flip=False, rotation=False,
-                                                   photometric_augmentations=False)
+                                                   horizontal_flip=True, rotation=False,
+                                                   photometric_augmentations=True)
     train_dataset = ConcatDataset((train_dataset_sintel, train_dataset_kitti2012,train_dataset_kitti2015))
 
     val_dataset = SINTELDataset(path=join(args.data_path, "sintel"),
