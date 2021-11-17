@@ -7,7 +7,7 @@ import torch.nn.functional as F
 import pytorch_lightning as pl
 
 from models.correlation import Correlation
-from models.decoder import Decoder, deconv, convrelu
+from models.decoder import Decoder as Decoder, deconv, convrelu
 
 
 class FastFlowNet(pl.LightningModule):
@@ -57,7 +57,6 @@ class FastFlowNet(pl.LightningModule):
         self.up6 = deconv(2, 2)
 
         self.decoder2 = Decoder(87, groups)
-        self.decoder2_f = Decoder(2, groups)
         self.decoder3 = Decoder(87, groups)
         self.decoder4 = Decoder(87, groups)
         self.decoder5 = Decoder(87, groups)

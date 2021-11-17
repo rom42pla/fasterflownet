@@ -26,12 +26,12 @@ def read_kitti_flow(flow_file):
 
 
 class KITTI2015FlowDataset(Dataset):
-    def __init__(self, path, random_crop=False, center_crop=False, zoom=False, rotation=False, horizontal_flip=False,photometric_augmentations=False):
+    def __init__(self, path, patch_size = (320,896),random_crop=False, center_crop=False, zoom=False, rotation=False, horizontal_flip=False,photometric_augmentations=False):
         assert exists(path)
         self.path = path
         self.photometric_augmentation = photometric_augmentations
         # data augmentations
-        self.patch_size = (320, 896)
+        self.patch_size = patch_size
         assert not (random_crop and center_crop)
         assert isinstance(random_crop, bool)
         self.random_crop = random_crop
